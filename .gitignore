@@ -1,0 +1,5 @@
+node_modules/
+dist/
+*.tgz
+.standard-vocal/
+.DS_Store

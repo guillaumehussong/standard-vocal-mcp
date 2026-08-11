@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Standard Vocal , Your AI phone receptionist</title>
+<style>
+  :root {
+    --bg: #f7f5f0;
+    --card: #ffffff;
+    --ink: #1a1712;
+    --muted: #6b665c;
+    --line: #ddd8cc;
+    --accent: #2f5069;
+    --accent-ink: #ffffff;
+    --ok: #2e7d4f;
+    --bad: #b3402e;
+    --radius: 0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px 80px; }
+  header { border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 28px; }
+  header h1 { font-size: 26px; letter-spacing: -0.02em; }
+  header p { color: var(--muted); margin-top: 6px; font-size: 15px; }
+  .steps { display: flex; gap: 8px; margin-bottom: 24px; }
+  .step-dot {
+    flex: 1; text-align: center; font-size: 13px; color: var(--muted);
+    padding: 10px 4px; border: 1px solid var(--line); background: var(--card);
+  }
+  .step-dot.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .step-dot.done { border-color: var(--ok); color: var(--ok); }
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    padding: 28px; border-radius: var(--radius);
+  }
+  .card h2 { font-size: 19px; margin-bottom: 6px; }
+  .card .hint { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+  .trades { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .trade {
+    border: 2px solid var(--line); background: var(--card); padding: 18px;
+    cursor: pointer; text-align: left; border-radius: var(--radius);
+    font-size: 15px; transition: border-color 0.15s;
+  }
+  .trade:hover { border-color: var(--accent); }
+  .trade.selected { border-color: var(--accent); background: #eef3f7; }
+  .trade .t-name { font-weight: 700; font-size: 16px; margin-bottom: 4px; }
+  .trade .t-desc { color: var(--muted); font-size: 13px; }
+  label { display: block; font-size: 14px; font-weight: 600; margin: 18px 0 6px; }
+  label small { font-weight: 400; color: var(--muted); }
+  input[type=text] {
+    width: 100%; padding: 12px; font-size: 15px; border: 1px solid var(--line);
+    border-radius: var(--radius); background: var(--card); color: var(--ink);
+  }
+  input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+  .actions { margin-top: 24px; display: flex; gap: 10px; flex-wrap: wrap; }
+  button.primary {
+    background: var(--accent); color: var(--accent-ink); border: none;
+    padding: 14px 28px; font-size: 16px; font-weight: 600; cursor: pointer;
+    border-radius: var(--radius);
+  }
+  button.primary:disabled { opacity: 0.5; cursor: wait; }
+  button.secondary {
+    background: var(--card); color: var(--ink); border: 1px solid var(--line);
+    padding: 12px 20px; font-size: 14px; cursor: pointer; border-radius: var(--radius);
+  }
+  .result { margin-top: 24px; padding: 20px; border: 1px solid var(--line); background: #fbfaf7; }
+  .result.ok { border-left: 4px solid var(--ok); }
+  .result.bad { border-left: 4px solid var(--bad); }
+  .result h3 { font-size: 16px; margin-bottom: 8px; }
+  .greeting {
+    background: var(--ink); color: #f0ede6; padding: 14px 16px; font-size: 14px;
+    margin: 12px 0; font-style: italic;
+  }
+  .greeting small { color: #a8a398; font-style: normal; display: block; margin-bottom: 4px; font-size: 12px; }
+  .score { font-size: 34px; font-weight: 700; }
+  .score.ok { color: var(--ok); }
+  .score.warn { color: #b07d2e; }
+  .score.bad { color: var(--bad); }
+  .checks { margin-top: 12px; font-size: 14px; }
+  .checks li { list-style: none; padding: 3px 0; }
+  .checks li::before { content: "✓ "; color: var(--ok); font-weight: 700; }
+  .checks li.fail::before { content: "✗ "; color: var(--bad); }
+  .checks li.fail { color: var(--bad); }
+  details { margin-top: 28px; border: 1px solid var(--line); background: var(--card); }
+  details summary { padding: 14px 18px; cursor: pointer; font-weight: 600; font-size: 14px; }
+  details .body { padding: 0 18px 18px; }
+  .hidden { display: none !important; }
+  .callme { margin-top: 18px; padding: 18px; border: 1px solid var(--line); background: #fbfaf7; }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: -2px; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .kv { font-size: 13px; color: var(--muted); margin-top: 8px; word-break: break-all; }
+  .adv-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .adv-row input { flex: 1; min-width: 200px; }
+  /* Modal */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(20,18,14,0.55);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal {
+    background: var(--card); border: 1px solid var(--line); padding: 28px;
+    max-width: 420px; width: 90%; border-radius: var(--radius);
+  }
+  .modal h3 { font-size: 18px; margin-bottom: 10px; }
+  .modal p { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Standard Vocal</h1>
+    <p data-i18n="tagline">Create your automated phone receptionist. It answers, talks and takes requests for you, 24/7.</p>
+  </header>
+
+  <div class="steps">
+    <div class="step-dot active" id="dot1" data-i18n="step1">1. Your country</div>
+    <div class="step-dot" id="dot2" data-i18n="step2">2. Your trade</div>
+    <div class="step-dot" id="dot3" data-i18n="step3">3. Your company</div>
+    <div class="step-dot" id="dot4" data-i18n="step4">4. Ready</div>
+  </div>
+
+  <!-- STEP 1 : country -->
+  <div class="card" id="step1">
+    <h2 data-i18n="s1title">Where is your business located?</h2>
+    <p class="hint" data-i18n="s1hint">The agent speaks the country's language and uses its local number.</p>
+    <div class="trades" id="markets"></div>
+    <div class="actions">
+      <button class="primary" id="next1" disabled data-i18n="continue">Continue</button>
+    </div>
+  </div>
+
+  <!-- STEP 2 : trade -->
+  <div class="card hidden" id="step2">
+    <h2 data-i18n="s2title">What is your trade?</h2>
+    <p class="hint" id="market-hint"></p>
+    <div class="trades" id="trades"></div>
+    <div class="actions">
+      <button class="secondary" id="back2" data-i18n="back">Back</button>
+      <button class="primary" id="next2" disabled data-i18n="continue">Continue</button>
+    </div>
+  </div>
+
+  <!-- STEP 3 : company -->
+  <div class="card hidden" id="step3">
+    <h2 data-i18n="s3title">Your business</h2>
+    <p class="hint" data-i18n="s3hint">This information is given to the agent so it introduces itself properly on the phone.</p>
+    <label for="company" data-i18n="companyLabel">Business name</label>
+    <input type="text" id="company">
+    <label for="places" data-i18n="placesLabel">Your towns or streets <small data-i18n="placesHint">(optional , the agent will recognize your customers' addresses better)</small></label>
+    <input type="text" id="places">
+    <div class="actions">
+      <button class="secondary" id="back3" data-i18n="back">Back</button>
+      <button class="primary" id="create" disabled data-i18n="createBtn">Create my agent</button>
+    </div>
+  </div>
+
+  <!-- STEP 4 : result -->
+  <div class="card hidden" id="step4">
+    <h2 id="res-title" data-i18n="s4title">Your agent is ready</h2>
+    <p class="hint" id="res-sub"></p>
+    <div class="greeting" id="greeting">
+      <small data-i18n="greetingLabel">Here is how it answers the phone:</small>
+      <span id="greeting-text"></span>
+    </div>
+    <div class="kv" id="asst-id"></div>
+    <div class="callme">
+      <label for="callnum" style="margin-top:0" data-i18n="callmeLabel">Your phone number <small data-i18n="callmeHint">(the agent actually calls you)</small></label>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <input type="text" id="callnum" style="flex:1;min-width:200px">
+        <button class="primary" id="callme-btn" data-i18n="callmeBtn">Call me</button>
+      </div>
+      <div id="callme-status" style="margin-top:10px;font-size:14px;color:var(--muted)"></div>
+    </div>
+    <div class="actions">
+      <button class="secondary" id="listen-btn" data-i18n="listenBtn">Listen to the voice</button>
+      <button class="secondary" id="eval-btn" data-i18n="evalBtn">Check quality</button>
+      <button class="secondary" id="restart" data-i18n="restartBtn">Create another agent</button>
+    </div>
+    <div id="audio-box" style="margin-top:14px"></div>
+    <div id="eval-result"></div>
+  </div>
+
+  <!-- Errors -->
+  <div class="result bad hidden" id="error-box" style="margin-top:16px">
+    <h3 data-i18n="errorTitle">Something went wrong</h3>
+    <p id="error-text" style="font-size:14px"></p>
+  </div>
+
+</div>
+
+<!-- SV coming-soon modal -->
+<div class="overlay hidden" id="sv-modal">
+  <div class="modal">
+    <h3 data-i18n="svTitle">El Salvador , coming soon</h3>
+    <p data-i18n="svBody">We are setting up Salvadoran phone numbers. Please pick another country for now, or check back soon.</p>
+    <button class="primary" id="sv-close" data-i18n="svClose">Got it</button>
+  </div>
+</div>
+
+<script>
+// ── i18n : la langue de l'UI suit le pays choisi ──
+const I18N = {
+  en: {
+    title: "Standard Vocal , Your AI phone receptionist",
+    tagline: "Create your automated phone receptionist. It answers, talks and takes requests for you, 24/7.",
+    step1: "1. Your country", step2: "2. Your trade", step3: "3. Your company", step4: "4. Ready",
+    s1title: "Where is your business located?",
+    s1hint: "The agent speaks the country's language and uses its local number.",
+    continue: "Continue", back: "Back",
+    s2title: "What is your trade?", pickTrade: "Pick your trade.",
+    s3title: "Your business",
+    s3hint: "This information is given to the agent so it introduces itself properly on the phone.",
+    companyLabel: "Business name",
+    companyPh: "e.g. Tree & Co",
+    placesLabel: "Your towns or streets",
+    placesHint: "(optional , the agent will recognize your customers' addresses better)",
+    placesPh: "e.g. Austin, Houston (comma separated)",
+    createBtn: "Create my agent",
+    creating: "Creating…",
+    s4title: "Your agent is ready",
+    greetingLabel: "Here is how it answers the phone:",
+    asstId: "Technical ID:",
+    callmeLabel: "Your phone number",
+    callmeHint: "(the agent actually calls you)",
+    callmeBtn: "Call me",
+    calling: "Calling…",
+    ringing: "Your phone will ring in a few seconds",
+    pickup: "Pick up and talk to your agent.",
+    listenBtn: "Listen to the voice", listenLoading: "Generating…",
+    evalBtn: "Check quality", evalLoading: "Testing (about 1 minute)…",
+    restartBtn: "Create another agent",
+    errorTitle: "Something went wrong",
+    enterPhone: "Enter your phone number.",
+    created: "Your agent is created and ready to answer.",
+    testedOn: "The agent was tested on",
+    testedOnSuffix: "real situations (quote, address correction, emergency, telemarketing).",
+    verdictPass: "Excellent", verdictWarn: "Correct but could be better", verdictFail: "Issues found",
+    countryFR: "+33 · French", countryUS: "+1 · English", countrySV: "+503 · Spanish",
+    svTitle: "El Salvador , coming soon",
+    svBody: "We are setting up Salvadoran phone numbers. Please pick another country for now, or check back soon.",
+    svClose: "Got it",
+  },
+  fr: {
+    title: "Standard Vocal , Votre standard téléphonique automatique",
+    tagline: "Créez votre standard téléphonique automatique. Il décroche, répond et prend les demandes à votre place, 24 h/24.",
+    step1: "1. Votre pays", step2: "2. Votre métier", step3: "3. Votre entreprise", step4: "4. C'est prêt",
+    s1title: "Dans quel pays se trouve votre entreprise ?",
+    s1hint: "L'agent parlera la langue du pays et utilisera le numéro local.",
+    continue: "Continuer", back: "Retour",
+    s2title: "Quel est votre métier ?", pickTrade: "Choisissez votre activité.",
+    s3title: "Votre entreprise",
+    s3hint: "Ces informations sont données à l'agent pour qu'il se présente correctement au téléphone.",
+    companyLabel: "Nom de votre entreprise",
+    companyPh: "Ex : L'Arbre en Nord",
+    placesLabel: "Vos communes ou rues",
+    placesHint: "(facultatif , l'agent reconnaîtra mieux les adresses de vos clients)",
+    placesPh: "Ex : Lille, Roubaix, Coutiches (séparés par des virgules)",
+    createBtn: "Créer mon agent",
+    creating: "Création en cours…",
+    s4title: "Votre agent est prêt",
+    greetingLabel: "Voici comment il répondra au téléphone :",
+    asstId: "Identifiant technique :",
+    callmeLabel: "Votre numéro de téléphone",
+    callmeHint: "(l'agent vous appelle pour de vrai)",
+    callmeBtn: "Faites-vous appeler",
+    calling: "Appel en cours…",
+    ringing: "Votre téléphone va sonner dans quelques secondes",
+    pickup: "Décrochez et parlez à votre agent.",
+    listenBtn: "Écouter la voix", listenLoading: "Génération…",
+    evalBtn: "Vérifier la qualité", evalLoading: "Test en cours (environ 1 minute)…",
+    restartBtn: "Créer un autre agent",
+    errorTitle: "Une erreur est survenue",
+    enterPhone: "Entrez votre numéro de téléphone.",
+    created: "Votre agent est créé et prêt à répondre.",
+    testedOn: "L'agent a été testé sur",
+    testedOnSuffix: "situations réelles (devis, correction d'adresse, urgence, démarchage).",
+    verdictPass: "Excellent", verdictWarn: "Correct mais à améliorer", verdictFail: "Des problèmes détectés",
+    countryFR: "+33 · français", countryUS: "+1 · anglais", countrySV: "+503 · espagnol",
+    svTitle: "El Salvador , bientôt disponible",
+    svBody: "Nous configurons les numéros salvadoriens. Choisissez un autre pays pour l'instant, ou revenez plus tard.",
+    svClose: "Compris",
+  },
+  es: {
+    title: "Standard Vocal , Su recepcionista telefónica automática",
+    tagline: "Cree su recepcionista telefónica automática. Contesta, habla y toma los pedidos por usted, 24/7.",
+    step1: "1. Su país", step2: "2. Su oficio", step3: "3. Su empresa", step4: "4. Listo",
+    s1title: "¿Dónde está ubicada su empresa?",
+    s1hint: "El agente habla el idioma del país y usa el número local.",
+    continue: "Continuar", back: "Atrás",
+    s2title: "¿Cuál es su oficio?", pickTrade: "Elija su actividad.",
+    s3title: "Su empresa",
+    s3hint: "Esta información se le da al agente para que se presente correctamente por teléfono.",
+    companyLabel: "Nombre de su empresa",
+    companyPh: "Ej: Jardines del Norte",
+    placesLabel: "Sus municipios o calles",
+    placesHint: "(opcional , el agente reconocerá mejor las direcciones de sus clientes)",
+    placesPh: "Ej: Santa Tecla, San Miguel (separados por comas)",
+    createBtn: "Crear mi agente",
+    creating: "Creando…",
+    s4title: "Su agente está listo",
+    greetingLabel: "Así responde al teléfono:",
+    asstId: "Identificador técnico:",
+    callmeLabel: "Su número de teléfono",
+    callmeHint: "(el agente le llama de verdad)",
+    callmeBtn: "Que me llamen",
+    calling: "Llamando…",
+    ringing: "Su teléfono va a sonar en unos segundos",
+    pickup: "Conteste y hable con su agente.",
+    listenBtn: "Escuchar la voz", listenLoading: "Generando…",
+    evalBtn: "Verificar la calidad", evalLoading: "Probando (alrededor de 1 minuto)…",
+    restartBtn: "Crear otro agente",
+    errorTitle: "Ocurrió un error",
+    enterPhone: "Ingrese su número de teléfono.",
+    created: "Su agente está creado y listo para responder.",
+    testedOn: "El agente fue probado en",
+    testedOnSuffix: "situaciones reales (cotización, corrección de dirección, emergencia, telemarketing).",
+    verdictPass: "Excelente", verdictWarn: "Correcto pero mejorable", verdictFail: "Problemas detectados",
+    countryFR: "+33 · francés", countryUS: "+1 · inglés", countrySV: "+503 · español",
+    svTitle: "El Salvador , próximamente",
+    svBody: "Estamos configurando los números salvadoreños. Elija otro país por ahora, o vuelva más tarde.",
+    svClose: "Entendido",
+  }
+};
+
+let markets = [];
+let market = null;
+let vertical = null;
+let deployed = null;
+let currentLang = 'en';
+const $ = (id) => document.getElementById(id);
+
+function t(key) {
+  return (I18N[currentLang] || I18N.en)[key] ?? I18N.en[key] ?? key;
+}
+
+function applyLang() {
+  document.title = t('title');
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  $('company').placeholder = t('companyPh');
+  $('places').placeholder = t('placesPh');
+  $('callnum').placeholder = markets.find(x => x.id === market)?.phoneExample || t('callmeLabel');
+  renderMarkets();
+  if (vertical && market) loadTrades();
+}
+
+// ── Charger les pays ──
+async function loadMarkets() {
+  const res = await fetch('/api/verticals');
+  markets = await res.json();
+  renderMarkets();
+  // Default: US (video / default market)
+  const us = markets.find(m => m.id === 'us');
+  if (us) { selectMarket('us'); }
+}
+
+function renderMarkets() {
+  const container = $('markets');
+  container.innerHTML = '';
+  const descMap = { fr: t('countryFR'), us: t('countryUS'), sv: t('countrySV') };
+  for (const m of markets) {
+    const btn = document.createElement('button');
+    btn.className = 'trade';
+    btn.dataset.mid = m.id;
+    btn.innerHTML = `<div class="t-name">${m.flag} ${m.label}</div><div class="t-desc">${descMap[m.id] || m.locale}</div>`;
+    btn.onclick = () => selectMarket(m.id);
+    container.appendChild(btn);
+  }
+  if (market) {
+    const sel = container.querySelector(`[data-mid="${market}"]`);
+    if (sel) sel.classList.add('selected');
+  }
+}
+
+function selectMarket(id) {
+  market = id;
+  const m = markets.find(x => x.id === id);
+  if (m) {
+    currentLang = m.locale; // fr / en / es
+    applyLang();
+  }
+  $('next1').disabled = false;
+}
+
+// ── Charger les métiers du pays choisi ──
+function loadTrades() {
+  const m = markets.find(x => x.id === market);
+  const container = $('trades');
+  container.innerHTML = '';
+  $('market-hint').textContent = `${m.flag} ${m.label} , ${t('pickTrade')}`;
+  for (const v of m.verticals) {
+    const btn = document.createElement('button');
+    btn.className = 'trade';
+    btn.innerHTML = `<div class="t-name">${v.name}</div>`;
+    btn.onclick = () => {
+      vertical = v.id;
+      document.querySelectorAll('#trades .trade').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      $('next2').disabled = false;
+    };
+    container.appendChild(btn);
+  }
+}
+
+function show(n) {
+  for (const i of [1, 2, 3, 4]) {
+    $('step' + i).classList.toggle('hidden', i !== n);
+    $('dot' + i).classList.toggle('active', i === n);
+    $('dot' + i).classList.toggle('done', i < n);
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function showError(msg) {
+  $('error-text').textContent = msg;
+  $('error-box').classList.remove('hidden');
+}
+
+function hideError() { $('error-box').classList.add('hidden'); }
+
+$('next1').onclick = () => {
+  if (market === 'sv') {
+    // El Salvador : numéros en cours de configuration
+    $('sv-modal').classList.remove('hidden');
+    return;
+  }
+  loadTrades(); show(2);
+};
+$('sv-close').onclick = () => $('sv-modal').classList.add('hidden');
+$('sv-modal').onclick = (e) => { if (e.target === $('sv-modal')) $('sv-modal').classList.add('hidden'); };
+
+$('back2').onclick = () => show(1);
+$('next2').onclick = () => show(3);
+$('back3').onclick = () => show(2);
+$('company').oninput = () => { $('create').disabled = !$('company').value.trim(); };
+
+// ── Créer l'agent ──
+$('create').onclick = async () => {
+  hideError();
+  const btn = $('create');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>${t('creating')}`;
+  try {
+    const places = $('places').value.split(',').map(s => s.trim()).filter(Boolean);
+    const res = await fetch('/api/deploy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ market, vertical, company: $('company').value.trim(), extraKeywords: places })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error');
+    deployed = data;
+    $('greeting-text').textContent = data.greeting;
+    $('res-sub').textContent = `"${data.name}" , ${t('created')}`;
+    $('asst-id').textContent = `${t('asstId')} ${data.assistantId}`;
+    $('eval-result').innerHTML = '';
+    const m = markets.find(x => x.id === market);
+    $('callnum').placeholder = m.phoneExample || '+1 555 0132';
+    show(4);
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('createBtn');
+  }
+};
+
+// ── Call me (outbound call réel) ──
+$('callme-btn').onclick = async () => {
+  hideError();
+  const btn = $('callme-btn');
+  const num = $('callnum').value.trim();
+  if (!num) { showError(t('enterPhone')); return; }
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>${t('calling')}`;
+  $('callme-status').textContent = '';
+  try {
+    const res = await fetch('/api/call-me', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assistantId: deployed.assistantId, phoneNumber: num, market })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error');
+    $('callme-status').textContent = `${t('ringing')} (${data.to}). ${t('pickup')}`;
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('callmeBtn');
+  }
+};
+
+// ── Listen (TTS preview) ──
+$('listen-btn').onclick = async () => {
+  hideError();
+  const btn = $('listen-btn');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>${t('listenLoading')}`;
+  try {
+    const res = await fetch('/api/preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: deployed.greeting, voiceId: deployed.voiceId })
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d.error || `Error ${res.status}`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    $('audio-box').innerHTML = `<audio controls autoplay src="${url}" style="width:100%"></audio>`;
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('listenBtn');
+  }
+};
+
+// ── Eval ──
+$('eval-btn').onclick = async () => {
+  hideError();
+  const btn = $('eval-btn');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span>${t('evalLoading')}`;
+  try {
+    const res = await fetch('/api/eval', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assistantId: deployed.assistantId, market, vertical })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error');
+    const cls = data.grade >= 80 ? 'ok' : data.grade >= 55 ? 'warn' : 'bad';
+    const verdictMap = { PASS: t('verdictPass'), WARN: t('verdictWarn'), FAIL: t('verdictFail') };
+    let html = `<div class="result ok" style="margin-top:18px">
+      <h3>${t('evalBtn')} : <span class="score ${cls}">${data.grade}/100</span> , ${verdictMap[data.verdict] || data.verdict}</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:8px">${t('testedOn')} ${data.scenarios.length} ${t('testedOnSuffix')}</p>
+      <ul class="checks">`;
+    for (const sc of data.scenarios) {
+      for (const c of sc.passed) {
+        html += `<li class="${c.ok ? '' : 'fail'}">${c.check}</li>`;
+      }
+    }
+    html += `</ul></div>`;
+    $('eval-result').innerHTML = html;
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('evalBtn');
+  }
+};
+
+$('restart').onclick = () => {
+  market = null; vertical = null; deployed = null; currentLang = 'en';
+  $('company').value = ''; $('places').value = '';
+  document.querySelectorAll('#markets .trade, #trades .trade').forEach(b => b.classList.remove('selected'));
+  $('next1').disabled = true; $('next2').disabled = true; $('create').disabled = true;
+  applyLang();
+  loadMarkets();
+  show(1);
+};
+
+applyLang();
+loadMarkets();
+</script>
+</body>
+</html>

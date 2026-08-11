@@ -1,0 +1,52 @@
+{
+  "name": "standard-vocal-mcp",
+  "version": "0.2.0",
+  "description": "Voice Agent Factory MCP — deploy, eval, and audit phone agents built on Vapi. Differs from the official Vapi MCP: vertical templates, self-testing agents, audio forensics, prompt versioning, CI regression gates.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "standard-vocal-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch",
+    "test": "node dist/test-validate.js",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "files": [
+    "dist",
+    "verticals",
+    "evals",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "vapi",
+    "voice-agent",
+    "phone-agent",
+    "claude"
+  ],
+  "author": "Guillaume Jean Hussong <guillaume.h@ik.me> (https://tecn0.com)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/guillaumehussong/standard-vocal-mcp.git"
+  },
+  "mcpName": "io.github.guillaumehussong/standard-vocal-mcp",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "express": "^5.2.1",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
