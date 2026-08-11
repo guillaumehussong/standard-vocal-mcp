@@ -56,7 +56,7 @@ const TOOLS = [
   {
     name: "deploy_agent",
     description:
-      "Deploy a full production phone agent for a market (fr, us, sv) and a vertical. Available verticals — fr: elagueur, plombier, dentiste, veterinaire. us / sv: plombier, dentiste, veterinaire. Creates the Vapi assistant with prompt, voice, transcriber and keywords baked in. One call = one working agent.",
+      "Deploy a full production phone agent for a market (fr, us, sv) and a vertical. Available verticals — fr: elagueur, plombier, dentiste, veterinaire. us: plumber, tree-service, dentiste, veterinaire. sv: plombier, dentiste, veterinaire. Creates the Vapi assistant with prompt, voice, transcriber and keywords baked in. One call = one working agent.",
     inputSchema: {
       type: "object",
       properties: {

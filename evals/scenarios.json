@@ -341,9 +341,12 @@
             "weight": 30
           },
           {
-            "label": "Promet un rappel",
-            "mustContain": [
-              "rappel"
+            "label": "Respecte le refus de rappel (ne promet ni rappel ni SMS)",
+            "mustNotContain": [
+              "vous rappelle",
+              "vous rappellera",
+              "rappel de l'équipe",
+              "SMS de confirmation"
             ],
             "weight": 20
           }
@@ -423,6 +426,54 @@
               "goodbye|bye|great day|take care|good day|buen día|adiós|hasta luego|bonne journée|au revoir|à bientôt"
             ],
             "weight": 30
+          }
+        ]
+      },
+      {
+        "id": "dictee-difficile",
+        "label": "Dictée difficile (quatre-vingts, soixante-dix, paires)",
+        "turns": [
+          "Bonjour, une branche menace de tomber sur le toit, c'est urgent.",
+          "Au 97 rue des Lilas à Douai.",
+          "Oui c'est bien ça.",
+          "Martin. Notez mon numéro : zéro six quatre-vingt-quinze soixante-dix-huit vingt-trois quarante-et-un.",
+          "Oui c'est exact, merci."
+        ],
+        "checks": [
+          {
+            "label": "Traite l'urgence toit en priorité",
+            "anyOf": [
+              "tout de suite",
+              "priorité",
+              "préviens",
+              "immédiatement"
+            ],
+            "weight": 30
+          },
+          {
+            "label": "Confirme l'adresse 97 (quatre-vingt-dix-sept)",
+            "anyOf": [
+              "quatre.{0,4}vingt.{0,4}dix.{0,4}sept",
+              "97",
+              "neuf.{0,6}sept"
+            ],
+            "weight": 20
+          },
+          {
+            "label": "Épelle le numéro exact (06 95 78 23 41)",
+            "anyOf": [
+              "0.{0,3}6.{0,3}9.{0,3}5.{0,3}7.{0,3}8.{0,3}2.{0,3}3.{0,3}4.{0,3}1",
+              "zéro.{0,12}six.{0,12}neuf.{0,12}cinq"
+            ],
+            "weight": 30
+          },
+          {
+            "label": "Ne donne jamais de prix",
+            "mustNotContain": [
+              "€",
+              "euros"
+            ],
+            "weight": 20
           }
         ]
       }
@@ -775,7 +826,7 @@
         ]
       }
     ],
-    "plombier": [
+    "plumber": [
       {
         "id": "standard-quote",
         "label": "Standard quote (quick close)",
@@ -856,6 +907,110 @@
             "mustNotContain": [
               "faucet",
               "heater"
+            ],
+            "weight": 20
+          },
+          {
+            "label": "Takes the address",
+            "mustContain": [
+              "address|street|city"
+            ],
+            "weight": 20
+          },
+          {
+            "label": "Never quotes a price",
+            "mustNotContain": [
+              "dollar",
+              "\\$",
+              "cost",
+              "price"
+            ],
+            "weight": 30
+          }
+        ]
+      }
+    ],
+    "tree-service": [
+      {
+        "id": "standard-quote",
+        "label": "Tree removal quote (quick close)",
+        "turns": [
+          "Hi, I need a big oak tree removed from my backyard.",
+          "It's at 12 Jefferson Avenue in Austin.",
+          "Yes that's right.",
+          "My name is Sophia, my number is five one two, five five five, zero one nine eight.",
+          "Yes. Morning if possible.",
+          "Thanks, bye."
+        ],
+        "checks": [
+          {
+            "label": "Asks for job type",
+            "mustContain": [
+              "removal|trim|prun|stump"
+            ],
+            "weight": 15
+          },
+          {
+            "label": "Asks for address or city",
+            "mustContain": [
+              "address|city|where|location"
+            ],
+            "weight": 15
+          },
+          {
+            "label": "Asks for name",
+            "mustContain": [
+              "name|first name"
+            ],
+            "weight": 10
+          },
+          {
+            "label": "Confirms address by spelling digits",
+            "anyOf": [
+              "one.{0,4}two|12.*jefferson|twelve"
+            ],
+            "weight": 25
+          },
+          {
+            "label": "Never quotes a price",
+            "mustNotContain": [
+              "dollar",
+              "\\$",
+              "cost",
+              "price"
+            ],
+            "weight": 20
+          },
+          {
+            "label": "Closes with callback promise",
+            "mustContain": [
+              "call you back|call back|callback|reach you"
+            ],
+            "weight": 15
+          }
+        ]
+      },
+      {
+        "id": "storm-emergency",
+        "label": "Storm damage emergency (priority)",
+        "turns": [
+          "A tree just fell on my garage during the storm, I need someone now!",
+          "8 Lilac Street in Dayton.",
+          "Paul."
+        ],
+        "checks": [
+          {
+            "label": "Handles the emergency first",
+            "mustContain": [
+              "right away|immediately|team|emergency|urgent"
+            ],
+            "weight": 30
+          },
+          {
+            "label": "Does not ask standard quote questions",
+            "mustNotContain": [
+              "stump",
+              "pruning"
             ],
             "weight": 20
           },

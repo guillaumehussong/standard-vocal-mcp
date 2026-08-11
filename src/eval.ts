@@ -145,23 +145,34 @@ const FR_TENS: Record<string, number> = {
   vingt: 20, trente: 30, quarante: 40, cinquante: 50,
 };
 
+/** Parse the remainder after a tens base: "et onze", "et un", "dix(-huit)", or a plain unit. Returns [value, consumed] from index i. */
+function parseFrRemainder(tokens: string[], i: number): [number, number] {
+  if (tokens[i] === "et" && tokens[i + 1] === "onze") return [11, 2];
+  if (tokens[i] === "et" && (tokens[i + 1] === "un" || tokens[i + 1] === "une")) return [1, 2];
+  if (tokens[i] === "dix") {
+    const u = FR_UN[tokens[i + 1]];
+    if (u !== undefined && u >= 1 && u <= 9) return [10 + u, 2]; // dix-huit = 18
+    return [10, 1];
+  }
+  const u = FR_UN[tokens[i]];
+  if (u !== undefined && u > 0) return [u, 1];
+  return [0, 0];
+}
+
 /** Parse a French number (0-99) starting at tokens[i]. Returns [value, tokensConsumed] or [null, 0]. */
 function parseFrNumber(tokens: string[], i: number): [number | null, number] {
   const t = tokens[i];
   if (t === undefined) return [null, 0];
 
-  // quatre-vingt(-…) → 80-99 : "quatre vingt quinze" = 95
+  // quatre-vingt(-…) → 80-99 : "quatre vingt quinze" = 95, "quatre vingt dix huit" = 98
   if (t === "quatre" && tokens[i + 1] === "vingt") {
-    const u = FR_UN[tokens[i + 2]];
-    if (u !== undefined && u > 0) return [80 + u, 3];
-    return [80, 2];
+    const [r, n] = parseFrRemainder(tokens, i + 2);
+    return [80 + r, 2 + n];
   }
-  // soixante(-…) → 60-79 : "soixante quinze" = 75, "soixante et onze" = 71
+  // soixante(-…) → 60-79 : "soixante quinze" = 75, "soixante dix huit" = 78, "soixante et onze" = 71
   if (t === "soixante") {
-    if (tokens[i + 1] === "et" && tokens[i + 2] === "onze") return [71, 3];
-    const u = FR_UN[tokens[i + 1]];
-    if (u !== undefined && u > 0) return [60 + u, 2];
-    return [60, 1];
+    const [r, n] = parseFrRemainder(tokens, i + 1);
+    return [60 + r, 1 + n];
   }
   // dix-sept / dix-huit / dix-neuf
   if (t === "dix") {
@@ -171,12 +182,8 @@ function parseFrNumber(tokens: string[], i: number): [number | null, number] {
   }
   // vingt / trente / quarante / cinquante (+ et un)
   if (FR_TENS[t] !== undefined) {
-    const base = FR_TENS[t];
-    if (tokens[i + 1] === "et" && (tokens[i + 2] === "un" || tokens[i + 2] === "une"))
-      return [base + 1, 3];
-    const u = FR_UN[tokens[i + 1]];
-    if (u !== undefined && u > 0 && u < 10) return [base + u, 2];
-    return [base, 1];
+    const [r, n] = parseFrRemainder(tokens, i + 1);
+    return [FR_TENS[t] + r, 1 + n];
   }
   if (FR_UN[t] !== undefined) return [FR_UN[t], 1];
   return [null, 0];
