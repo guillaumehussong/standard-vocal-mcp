@@ -9,7 +9,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
-import { setVapiToken, vapiGet } from "./vapi.js";
+import { setVapiToken, vapiGet, vapiPost } from "./vapi.js";
 import { deployAgent } from "./deploy.js";
 import { runEval, setLLM } from "./eval.js";
 import { audioForensics } from "./forensics.js";
@@ -107,6 +107,19 @@ const TOOLS = [
         toVersion: { type: "string" },
       },
       required: ["action", "assistantId"],
+    },
+  },
+  {
+    name: "test_call",
+    description:
+      "Have an agent place a real outbound phone call. Uses the first phone number on the Vapi account as caller ID. The customer number accepts E.164 (+14155550132) or local formats (10-digit US, 10-digit FR starting with 0, 8-digit SV).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        assistantId: { type: "string" },
+        phoneNumber: { type: "string", description: "Destination number, E.164 or local format" },
+      },
+      required: ["assistantId", "phoneNumber"],
     },
   },
   {
@@ -210,6 +223,29 @@ export function createServer(): Server {
             return out(await promptRollback(p.assistantId, p.toVersion));
           }
           throw new Error("unknown action");
+        }
+
+        case "test_call": {
+          const p = z
+            .object({ assistantId: z.string(), phoneNumber: z.string() })
+            .parse(args);
+          let num = p.phoneNumber.replace(/[\s.-]/g, "");
+          if (num.startsWith("0") && num.length === 10) num = "+33" + num.slice(1);
+          else if (/^\d{10}$/.test(num)) num = "+1" + num;
+          else if (/^\d{8}$/.test(num)) num = "+503" + num;
+          if (!/^\+[1-9]\d{7,14}$/.test(num)) {
+            throw new Error(`invalid number: ${p.phoneNumber} (use E.164, e.g. +14155550132)`);
+          }
+          const phones = (await vapiGet("/phone-number")) as Record<string, unknown>[];
+          if (!phones.length) {
+            throw new Error("no phone number on this Vapi account — buy one in the Vapi dashboard first");
+          }
+          const call = (await vapiPost("/call", {
+            phoneNumberId: phones[0].id,
+            customer: { number: num },
+            assistantId: p.assistantId,
+          })) as Record<string, unknown>;
+          return out({ callId: call.id, status: call.status, to: num, from: phones[0].number });
         }
 
         case "regression_gate": {
