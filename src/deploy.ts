@@ -90,9 +90,9 @@ export async function deployAgent(input: DeployInput): Promise<DeployOutput> {
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     // Custom voices only exist on the org that owns them. On any other account
-    // (demo/sandbox), retry once with a public premade 11labs voice (Rachel).
+    // (demo/sandbox), retry once with a public premade 11labs voice (Jessica).
     if (!input.voiceIdOverride && /couldn't find .* voice/i.test(msg)) {
-      voiceId = "21m00Tcm4TlvDq8ikWAM";
+      voiceId = "cgSgspJ2msm6clMCkdW9";
       (body.voice as { voiceId: string }).voiceId = voiceId;
       created = await vapiPost("/assistant", body);
     } else {
