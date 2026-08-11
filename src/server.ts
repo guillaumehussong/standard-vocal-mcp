@@ -240,12 +240,14 @@ export function createServer(): Server {
           if (!phones.length) {
             throw new Error("no phone number on this Vapi account — buy one in the Vapi dashboard first");
           }
+          // Prefer an imported (twilio/vonage) number: free Vapi numbers can't call international.
+          const phone = phones.find((p) => p.provider !== "vapi") || phones[0];
           const call = (await vapiPost("/call", {
-            phoneNumberId: phones[0].id,
+            phoneNumberId: phone.id,
             customer: { number: num },
             assistantId: p.assistantId,
           })) as Record<string, unknown>;
-          return out({ callId: call.id, status: call.status, to: num, from: phones[0].number });
+          return out({ callId: call.id, status: call.status, to: num, from: phone.number });
         }
 
         case "regression_gate": {
