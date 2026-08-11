@@ -54,7 +54,7 @@ export async function deployAgent(input: DeployInput): Promise<DeployOutput> {
     .flatMap((k) => k.split(/[\s'-]+/))
     .map((k) => k.replace(/[^\p{L}\p{N}]/gu, ""))
     .filter((k) => k.length > 0);
-  const asstName = (input.name || `${tpl.name}, ${input.company}`).slice(0, 40);
+  const asstName = (input.name || `${input.company} — ${tpl.name}`).slice(0, 40);
 
   const body = {
     name: asstName,
@@ -83,7 +83,22 @@ export async function deployAgent(input: DeployInput): Promise<DeployOutput> {
     },
   };
 
-  const created = await vapiPost("/assistant", body);
+  let voiceId = input.voiceIdOverride || market.voice.voiceId;
+  let created: any;
+  try {
+    created = await vapiPost("/assistant", body);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // Custom voices only exist on the org that owns them. On any other account
+    // (demo/sandbox), retry once with a public premade 11labs voice (Rachel).
+    if (!input.voiceIdOverride && /couldn't find .* voice/i.test(msg)) {
+      voiceId = "21m00Tcm4TlvDq8ikWAM";
+      (body.voice as { voiceId: string }).voiceId = voiceId;
+      created = await vapiPost("/assistant", body);
+    } else {
+      throw e;
+    }
+  }
   return {
     assistantId: created.id,
     name: created.name,
@@ -92,7 +107,7 @@ export async function deployAgent(input: DeployInput): Promise<DeployOutput> {
     company: input.company,
     greeting,
     keywords,
-    voiceId: input.voiceIdOverride || market.voice.voiceId,
+    voiceId,
     locale: market.locale,
   };
 }
