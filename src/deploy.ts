@@ -54,7 +54,7 @@ export async function deployAgent(input: DeployInput): Promise<DeployOutput> {
     .flatMap((k) => k.split(/[\s'-]+/))
     .map((k) => k.replace(/[^\p{L}\p{N}]/gu, ""))
     .filter((k) => k.length > 0);
-  const asstName = (input.name || `${input.company} — ${tpl.name}`).slice(0, 40);
+  const asstName = (input.name || `${name_} — ${input.company}`).slice(0, 40);
 
   const body = {
     name: asstName,

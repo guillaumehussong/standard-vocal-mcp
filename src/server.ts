@@ -149,7 +149,7 @@ export function createServer(): Server {
           return out(
             assistants.map((a) => ({
               id: a.id,
-              name: a.name,
+              agentName: a.name,
               model: (a.model as Record<string, unknown>)?.model,
               voice: (a.voice as Record<string, unknown>)?.voiceId,
               voiceProvider: (a.voice as Record<string, unknown>)?.provider,
