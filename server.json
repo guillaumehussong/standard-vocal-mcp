@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.guillaumehussong/standard-vocal-mcp",
+  "description": "Voice Agent Factory for Vapi: vertical templates, self-testing agents, audio forensics, CI gates.",
+  "repository": {
+    "url": "https://github.com/guillaumehussong/standard-vocal-mcp",
+    "source": "github"
+  },
+  "version": "0.1.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "standard-vocal-mcp",
+      "version": "0.1.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "description": "Vapi API token (or VAPI_API_KEY)",
+          "isRequired": true,
+          "format": "string",
+          "isSecret": true,
+          "name": "VAPI_TOKEN"
+        },
+        {
+          "description": "OpenAI API key (used for eval simulations and audio forensics)",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "OPENAI_API_KEY"
+        }
+      ]
+    }
+  ]
+}
