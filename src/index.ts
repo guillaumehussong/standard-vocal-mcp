@@ -44,7 +44,7 @@ if (OPENAI_KEY) {
 }
 
 const server = new Server(
-  { name: "standard-vocal-mcp", version: "0.2.0" },
+  { name: "standard-vocal-mcp", version: "0.3.0" },
   { capabilities: { tools: {} } }
 );
 

@@ -1,6 +1,6 @@
 {
   "name": "standard-vocal-mcp",
-  "version": "0.1.1",
+  "version": "0.3.0",
   "description": "Voice Agent Factory MCP — deploy, eval, and audit phone agents built on Vapi. Differs from the official Vapi MCP: vertical templates, self-testing agents, audio forensics, prompt versioning, CI regression gates.",
   "type": "module",
   "main": "dist/index.js",

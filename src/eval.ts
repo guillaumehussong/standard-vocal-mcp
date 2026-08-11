@@ -36,6 +36,12 @@ export interface EvalScenario {
   label: string;
   turns: string[];
   checks: EvalCheck[];
+  /**
+   * Caller number injected into {{customer.number}} for this scenario.
+   * Default: EVAL_CALLER_NUMBER env or "+33612345678". Set to false to
+   * simulate a hidden/absent caller number (tests the "no number visible" branch).
+   */
+  callerNumber?: string | false;
 }
 
 export interface EvalCheck {
@@ -102,31 +108,101 @@ export function extractNumbers(text: string): string[] {
     const digits = m[0].replace(/\D/g, "");
     if (digits.length >= 6) found.push(digits);
   }
-  // 2) spelled-out runs: "zéro, six, sept, cinq…"
+  // 2) spelled-out runs, including French compound numbers:
+  //    "zéro six soixante-quinze quarante-quatre quinze soixante-quatorze" → 0675441574
   const tokens = text.toLowerCase().split(/[^a-zàâäéèêëîïôöùûüç]+/i).filter(Boolean);
   let run = "";
   const flush = () => {
     if (run.length >= 6) found.push(run);
     run = "";
   };
-  for (const tok of tokens) {
-    if (DIGIT_WORDS[tok] !== undefined) run += DIGIT_WORDS[tok];
-    else flush();
+  let i = 0;
+  while (i < tokens.length) {
+    const [val, consumed] = parseFrNumber(tokens, i);
+    if (val !== null) {
+      run += String(val);
+      i += consumed;
+    } else if (DIGIT_WORDS[tokens[i]] !== undefined) {
+      run += DIGIT_WORDS[tokens[i]];
+      i++;
+    } else {
+      flush();
+      i++;
+    }
   }
   flush();
   return found;
 }
 
+// ─── French number parser (0–99, phone dictation style) ────────────────────
+
+const FR_UN: Record<string, number> = {
+  "zéro": 0, un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5,
+  six: 6, sept: 7, huit: 8, neuf: 9, dix: 10, onze: 11, douze: 12,
+  treize: 13, quatorze: 14, quinze: 15, seize: 16,
+};
+const FR_TENS: Record<string, number> = {
+  vingt: 20, trente: 30, quarante: 40, cinquante: 50,
+};
+
+/** Parse a French number (0-99) starting at tokens[i]. Returns [value, tokensConsumed] or [null, 0]. */
+function parseFrNumber(tokens: string[], i: number): [number | null, number] {
+  const t = tokens[i];
+  if (t === undefined) return [null, 0];
+
+  // quatre-vingt(-…) → 80-99 : "quatre vingt quinze" = 95
+  if (t === "quatre" && tokens[i + 1] === "vingt") {
+    const u = FR_UN[tokens[i + 2]];
+    if (u !== undefined && u > 0) return [80 + u, 3];
+    return [80, 2];
+  }
+  // soixante(-…) → 60-79 : "soixante quinze" = 75, "soixante et onze" = 71
+  if (t === "soixante") {
+    if (tokens[i + 1] === "et" && tokens[i + 2] === "onze") return [71, 3];
+    const u = FR_UN[tokens[i + 1]];
+    if (u !== undefined && u > 0) return [60 + u, 2];
+    return [60, 1];
+  }
+  // dix-sept / dix-huit / dix-neuf
+  if (t === "dix") {
+    const u = FR_UN[tokens[i + 1]];
+    if (u !== undefined && u >= 7 && u <= 9) return [10 + u, 2];
+    return [10, 1];
+  }
+  // vingt / trente / quarante / cinquante (+ et un)
+  if (FR_TENS[t] !== undefined) {
+    const base = FR_TENS[t];
+    if (tokens[i + 1] === "et" && (tokens[i + 2] === "un" || tokens[i + 2] === "une"))
+      return [base + 1, 3];
+    const u = FR_UN[tokens[i + 1]];
+    if (u !== undefined && u > 0 && u < 10) return [base + u, 2];
+    return [base, 1];
+  }
+  if (FR_UN[t] !== undefined) return [FR_UN[t], 1];
+  return [null, 0];
+}
+
 function numbersEqual(a: string, b: string): boolean {
   if (a === b) return true;
   // tolerate country-code prefix differences (+33 6… vs 06…)
-  const [long, short] = a.length >= b.length ? [a, b] : [b, a];
-  return short.length >= 6 && long.endsWith(short);
+  const variants = (n: string): string[] => {
+    const v = [n];
+    if (n.startsWith("33")) v.push("0" + n.slice(2));
+    if (n.startsWith("0")) v.push("33" + n.slice(1));
+    return v;
+  };
+  for (const x of variants(a))
+    for (const y of variants(b)) {
+      if (x === y) return true;
+      const [long, short] = x.length >= y.length ? [x, y] : [y, x];
+      if (short.length >= 6 && long.endsWith(short)) return true;
+    }
+  return false;
 }
 
 interface HardFailure { scenario: string; check: string; detail: string }
 
-function runHardChecks(scenarioLabel: string, turns: TurnLog[]): HardFailure[] {
+function runHardChecks(scenarioLabel: string, turns: TurnLog[], knownNumbers: string[]): HardFailure[] {
   const failures: HardFailure[] = [];
 
   // Hard check 1 — no template/prompt leak: [ ] never belong in speech
@@ -141,8 +217,9 @@ function runHardChecks(scenarioLabel: string, turns: TurnLog[]): HardFailure[] {
     }
   }
 
-  // Hard check 2 — phone fidelity: every number the agent says must be one the caller gave
-  const userNumbers = turns.flatMap((t) => extractNumbers(t.user));
+  // Hard check 2 — phone fidelity: every number the agent says must come from
+  // the caller (user turns) or the injected caller ID (knownNumbers)
+  const userNumbers = [...turns.flatMap((t) => extractNumbers(t.user)), ...knownNumbers];
   for (const t of turns) {
     for (const num of extractNumbers(t.assistant)) {
       if (!userNumbers.some((u) => numbersEqual(u, num))) {
@@ -150,7 +227,7 @@ function runHardChecks(scenarioLabel: string, turns: TurnLog[]): HardFailure[] {
           scenario: scenarioLabel,
           check: "phone-fidelity",
           detail: userNumbers.length
-            ? `agent said ${num} but caller gave ${userNumbers.join(", ")}`
+            ? `agent said ${num} but available numbers were ${userNumbers.join(", ")}`
             : `agent invented ${num} — caller never gave a number`,
         });
       }
@@ -185,8 +262,19 @@ export async function runEval(
   let maxScore = 0;
 
   for (const sc of scenarios) {
+    // Substitute Vapi template variables like a real call would — otherwise the
+    // agent sees a raw {{customer.number}} and hallucinates a number to fill it.
+    const callerNumber =
+      sc.callerNumber === false
+        ? null
+        : sc.callerNumber ?? process.env.EVAL_CALLER_NUMBER ?? "+33612345678";
+    const scenarioPrompt = systemPrompt
+      .replaceAll("{{date}}", new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }))
+      .replaceAll("{{customer.number}}", callerNumber ?? "non disponible (numéro masqué)");
+    const knownNumbers = callerNumber ? extractNumbers(callerNumber) : [];
+
     const messages: { role: string; content: string }[] = [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: scenarioPrompt },
     ];
     const turns: TurnLog[] = [];
     let assistantText = "";
@@ -235,7 +323,7 @@ export async function runEval(
     passed.push({ check: `≤ ${MAX_QUESTIONS_PER_TURN} questions per turn (max seen: ${maxQ})`, ok: qOk });
 
     // Global hard checks: any failure forces the whole report to FAIL
-    const hard = runHardChecks(sc.label, turns);
+    const hard = runHardChecks(sc.label, turns, knownNumbers);
     hardFailures.push(...hard);
     passed.push(
       { check: "HARD: no template leak", ok: !hard.some((h) => h.check === "anti-leak") },
