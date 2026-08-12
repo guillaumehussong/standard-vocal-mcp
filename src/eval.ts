@@ -14,12 +14,21 @@ export function setLLM(cfg: { apiKey: string; baseURL?: string }) {
   llmConfig = { apiKey: cfg.apiKey, baseURL: cfg.baseURL ?? "https://api.openai.com/v1" };
 }
 
-async function llmChat(messages: { role: string; content: string }[], model: string, temperature = 0.6, maxTokens = 200): Promise<string> {
-  if (!llmConfig) throw new Error("LLM not configured (setLLM)");
-  const res = await fetch(`${llmConfig.baseURL}/chat/completions`, {
+export type LlmConfig = { apiKey: string; baseURL: string };
+
+async function llmChat(
+  messages: { role: string; content: string }[],
+  model: string,
+  temperature = 0.6,
+  maxTokens = 200,
+  llmOverride?: LlmConfig
+): Promise<string> {
+  const cfg = llmOverride ?? llmConfig;
+  if (!cfg) throw new Error("LLM not configured (setLLM)");
+  const res = await fetch(`${cfg.baseURL}/chat/completions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${llmConfig.apiKey}`,
+      Authorization: `Bearer ${cfg.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ model, messages, temperature, max_tokens: maxTokens }),
@@ -249,12 +258,24 @@ const QUESTIONS_WEIGHT = 10;
 
 // ─── Runner ─────────────────────────────────────────────────────────────────
 
+export interface RunEvalOpts {
+  /** Per-request Vapi token (Smithery). Falls back to module global. */
+  vapiToken?: string;
+  /** Per-request LLM config. Falls back to module global from setLLM. */
+  llm?: { apiKey: string; baseURL?: string };
+}
+
 export async function runEval(
   assistantId: string,
-  scenarios: EvalScenario[]
+  scenarios: EvalScenario[],
+  opts?: RunEvalOpts
 ): Promise<EvalReport> {
+  const llm: LlmConfig | undefined = opts?.llm
+    ? { apiKey: opts.llm.apiKey, baseURL: opts.llm.baseURL ?? "https://api.openai.com/v1" }
+    : undefined;
+
   // Fetch the assistant's live prompt + model from Vapi
-  const assistant = await vapiGet(`/assistant/${assistantId}`);
+  const assistant = await vapiGet(`/assistant/${assistantId}`, opts?.vapiToken);
   const systemPrompt: string = assistant.model?.messages?.[0]?.content ?? "";
   const model: string = assistant.model?.model ?? "gpt-4.1";
   const temperature: number = assistant.model?.temperature ?? 0.6;
@@ -288,7 +309,7 @@ export async function runEval(
 
     for (const userMsg of sc.turns) {
       messages.push({ role: "user", content: userMsg });
-      const response = await llmChat(messages, model, temperature, maxTokens);
+      const response = await llmChat(messages, model, temperature, maxTokens, llm);
       messages.push({ role: "assistant", content: response });
       turns.push({ user: userMsg, assistant: response });
       assistantText += "\n" + response;

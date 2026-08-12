@@ -30,8 +30,11 @@ function save(entries: HistoryEntry[]) {
 }
 
 /** Snapshot current prompt from Vapi into local history (call on fetch or after update). */
-export async function promptSnapshot(assistantId: string): Promise<{ version: string; prompt: string }> {
-  const a = await vapiGet(`/assistant/${assistantId}`);
+export async function promptSnapshot(
+  assistantId: string,
+  vapiToken?: string
+): Promise<{ version: string; prompt: string }> {
+  const a = await vapiGet(`/assistant/${assistantId}`, vapiToken);
   const prompt = a.model?.messages?.[0]?.content ?? "";
   const version = a.latestVersion ?? a.version ?? "unknown";
   const entries = load();
@@ -53,19 +56,23 @@ export function promptDiff(assistantId: string, fromVersion: string, toVersion: 
 }
 
 /** Rollback: push an old prompt back to Vapi. */
-export async function promptRollback(assistantId: string, toVersion: string) {
+export async function promptRollback(assistantId: string, toVersion: string, vapiToken?: string) {
   const entries = load().filter((e) => e.assistantId === assistantId);
   const target = entries.find((e) => e.version === toVersion);
   if (!target) throw new Error("version not found in local history");
-  await vapiPatch(`/assistant/${assistantId}`, {
-    model: {
-      provider: "openai",
-      model: "gpt-4.1",
-      temperature: 0.6,
-      maxTokens: 200,
-      messages: [{ role: "system", content: target.prompt }],
+  await vapiPatch(
+    `/assistant/${assistantId}`,
+    {
+      model: {
+        provider: "openai",
+        model: "gpt-4.1",
+        temperature: 0.6,
+        maxTokens: 200,
+        messages: [{ role: "system", content: target.prompt }],
+      },
     },
-  });
+    vapiToken
+  );
   return { rolledBackTo: toVersion };
 }
 

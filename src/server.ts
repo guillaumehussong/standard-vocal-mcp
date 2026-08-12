@@ -44,6 +44,12 @@ export function bootstrapEnv(): void {
   }
 }
 
+/** Per-request config (Smithery). When omitted, tools use module globals from bootstrapEnv. */
+export interface ServerConfig {
+  vapiToken?: string;
+  openaiKey?: string;
+}
+
 // ─── Tool definitions ────────────────────────────────────────────────────────
 
 const TOOLS = [
@@ -141,7 +147,16 @@ const TOOLS = [
 
 // ─── Server factory ──────────────────────────────────────────────────────────
 
-export function createServer(): Server {
+export function createServer(config?: ServerConfig): Server {
+  // Capture per-request credentials in the handler closure (concurrency-safe).
+  const vapiToken = config?.vapiToken;
+  const evalOpts = {
+    vapiToken,
+    llm: config?.openaiKey
+      ? { apiKey: config.openaiKey, baseURL: "https://api.openai.com/v1" }
+      : undefined,
+  };
+
   const server = new Server(
     { name: "standard-vocal-mcp", version: "0.3.1" },
     { capabilities: { tools: {} } }
@@ -158,7 +173,7 @@ export function createServer(): Server {
     try {
       switch (name) {
         case "list_agents": {
-          const assistants = (await vapiGet("/assistant")) as Record<string, unknown>[];
+          const assistants = (await vapiGet("/assistant", vapiToken)) as Record<string, unknown>[];
           return out(
             assistants.map((a) => ({
               id: a.id,
@@ -183,7 +198,7 @@ export function createServer(): Server {
               name: z.string().optional(),
             })
             .parse(args);
-          return out(await deployAgent(p));
+          return out(await deployAgent(p, vapiToken));
         }
 
         case "run_eval": {
@@ -196,12 +211,12 @@ export function createServer(): Server {
             .parse(args);
           const scenarios = evalScenarios[p.market]?.[p.vertical];
           if (!scenarios) throw new Error(`no scenarios for ${p.market}/${p.vertical}`);
-          return out(await runEval(p.assistantId, scenarios));
+          return out(await runEval(p.assistantId, scenarios, evalOpts));
         }
 
         case "audio_forensics": {
           const p = z.object({ callId: z.string() }).parse(args);
-          return out(await audioForensics(p.callId));
+          return out(await audioForensics(p.callId, vapiToken));
         }
 
         case "prompt_diff": {
@@ -213,14 +228,14 @@ export function createServer(): Server {
               toVersion: z.string().optional(),
             })
             .parse(args);
-          if (p.action === "snapshot") return out(await promptSnapshot(p.assistantId));
+          if (p.action === "snapshot") return out(await promptSnapshot(p.assistantId, vapiToken));
           if (p.action === "diff") {
             if (!p.fromVersion || !p.toVersion) throw new Error("fromVersion and toVersion required for diff");
             return out(promptDiff(p.assistantId, p.fromVersion, p.toVersion));
           }
           if (p.action === "rollback") {
             if (!p.toVersion) throw new Error("toVersion required for rollback");
-            return out(await promptRollback(p.assistantId, p.toVersion));
+            return out(await promptRollback(p.assistantId, p.toVersion, vapiToken));
           }
           throw new Error("unknown action");
         }
@@ -236,17 +251,21 @@ export function createServer(): Server {
           if (!/^\+[1-9]\d{7,14}$/.test(num)) {
             throw new Error(`invalid number: ${p.phoneNumber} (use E.164, e.g. +14155550132)`);
           }
-          const phones = (await vapiGet("/phone-number")) as Record<string, unknown>[];
+          const phones = (await vapiGet("/phone-number", vapiToken)) as Record<string, unknown>[];
           if (!phones.length) {
             throw new Error("no phone number on this Vapi account — buy one in the Vapi dashboard first");
           }
           // Prefer an imported (twilio/vonage) number: free Vapi numbers can't call international.
           const phone = phones.find((p) => p.provider !== "vapi") || phones[0];
-          const call = (await vapiPost("/call", {
-            phoneNumberId: phone.id,
-            customer: { number: num },
-            assistantId: p.assistantId,
-          })) as Record<string, unknown>;
+          const call = (await vapiPost(
+            "/call",
+            {
+              phoneNumberId: phone.id,
+              customer: { number: num },
+              assistantId: p.assistantId,
+            },
+            vapiToken
+          )) as Record<string, unknown>;
           return out({ callId: call.id, status: call.status, to: num, from: phone.number });
         }
 
@@ -261,7 +280,7 @@ export function createServer(): Server {
             .parse(args);
           const scenarios = evalScenarios[p.market]?.[p.vertical];
           if (!scenarios) throw new Error(`no scenarios for ${p.market}/${p.vertical}`);
-          const report = await runEval(p.assistantId, scenarios);
+          const report = await runEval(p.assistantId, scenarios, evalOpts);
           const allowed = report.grade >= p.baselineScore;
           return out({
             allowed,

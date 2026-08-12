@@ -2,7 +2,7 @@
  * audio_forensics — downloads the 3 recording tracks of a call and runs RMS analysis.
  * Automates exactly the investigation we ran by hand: locate noise source (client/assistant/mono).
  */
-import { vapiGet, vapiDownload } from "./vapi.js";
+import { vapiDownload } from "./vapi.js";
 import { parseWav, trackStats, type TrackStats } from "./lib/audio.js";
 
 export interface ForensicsReport {
@@ -14,11 +14,11 @@ export interface ForensicsReport {
   interpretation: string;
 }
 
-export async function audioForensics(callId: string): Promise<ForensicsReport> {
+export async function audioForensics(callId: string, vapiToken?: string): Promise<ForensicsReport> {
   const [monoBuf, customerBuf, assistantBuf] = await Promise.all([
-    vapiDownload(`/call/${callId}/mono-recording`),
-    vapiDownload(`/call/${callId}/customer-recording`),
-    vapiDownload(`/call/${callId}/assistant-recording`),
+    vapiDownload(`/call/${callId}/mono-recording`, vapiToken),
+    vapiDownload(`/call/${callId}/customer-recording`, vapiToken),
+    vapiDownload(`/call/${callId}/assistant-recording`, vapiToken),
   ]);
 
   const customer = trackStats(parseWav(customerBuf));

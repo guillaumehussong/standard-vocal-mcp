@@ -36,7 +36,7 @@ export interface DeployOutput {
   locale: string;
 }
 
-export async function deployAgent(input: DeployInput): Promise<DeployOutput> {
+export async function deployAgent(input: DeployInput, vapiToken?: string): Promise<DeployOutput> {
   const market = markets[input.market];
   if (!market) throw new Error(`unknown market: ${input.market}. Available: ${Object.keys(markets).join(", ")}`);
   const tpl = market.verticals[input.vertical];
@@ -86,7 +86,7 @@ export async function deployAgent(input: DeployInput): Promise<DeployOutput> {
   let voiceId = input.voiceIdOverride || market.voice.voiceId;
   let created: any;
   try {
-    created = await vapiPost("/assistant", body);
+    created = await vapiPost("/assistant", body, vapiToken);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     // Custom voices only exist on the org that owns them. On any other account
@@ -94,7 +94,7 @@ export async function deployAgent(input: DeployInput): Promise<DeployOutput> {
     if (!input.voiceIdOverride && /couldn't find .* voice/i.test(msg)) {
       voiceId = "cgSgspJ2msm6clMCkdW9";
       (body.voice as { voiceId: string }).voiceId = voiceId;
-      created = await vapiPost("/assistant", body);
+      created = await vapiPost("/assistant", body, vapiToken);
     } else {
       throw e;
     }
